@@ -3,7 +3,7 @@
 // para registrar y guardar la informacion en la base de datos.
 import mongoose from "mongoose";
 
-// Definimos el schema de nuestra entidad para guardar sus datos
+// Definimos el schema de nuestra entidad para modelar sus datos
 // correctamente en la base de datos.
 const workerSchema = mongoose.Schema({
   name: {
@@ -16,7 +16,10 @@ const workerSchema = mongoose.Schema({
   },
   workArea: {
     type: String,
-    required: [true, "El trabajador debe tener una Area de trabajo"],
+    required: [true, "El trabajador debe tener un Area de trabajo"],
   },
 });
+// Creamos y exportamos el modelo de nuestra entidad Worker que nos
+// permitira acceder a la base de datos y consultar la informacion
+// relacionada a esa entidad.
 export default mongoose.model("Worker", workerSchema);
