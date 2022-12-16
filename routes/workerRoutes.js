@@ -15,13 +15,13 @@ const api = {
 
 // Con esta expresion regular verificamos si las peticiones estan
 // apuntando a una url de la aplicacion correcta.
-const expresionRegularDeLaUrlNormal = /^\/api\/v1\/workers\/?$/;
+const expRegRutaEstatica = /^\/api\/v1\/workers\/?$/;
 
 // Al igual que la primera expresion regular se encarga de verificar
 // las urls de las peticiones pero esta vez se encarga de buscar
 //  un ID con el cual buscaremos datos especificos en la
 // base de datos.
-const expresionRegularDeLaUrlConId = /^\/api\/v1\/workers\/?[(0-9 | a-z)]+$/;
+const expRegRutaDinamica = /^\/api\/v1\/workers\/?[(0-9 | a-z)]+$/;
 
 /**
  * Se encarga de extraer los IDs de las urls
@@ -45,104 +45,105 @@ const router = async function (req, res) {
   // apuntan las peticiones cumplan las reglas para recibirlas correcta-
   // mente. Si se cumple la condicion la peticion sera recibida y proce-
   // sada correctamente, en el caso contrario la aplicacion se encarga.
-  if (
-    !expresionRegularDeLaUrlNormal.test(req.url) &&
-    !expresionRegularDeLaUrlConId.test(req.url)
-  ) {
+
+  if (!expRegRutaEstatica.test(req.url) && !expRegRutaDinamica.test(req.url)) {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ message: "Pagina no encontrada" }));
   } else {
     // Ya verificado que la url si cumple con las reglas, pasamos a ver que tipo
     // de peticion estamos recibiendo.
 
-    // Metodo GET
-    if (expresionRegularDeLaUrlNormal.test(req.url) && req.method === api.get) {
-      const workers = await Worker.find();
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(workers));
-    }
-
-    // Metodo GET con un ID para consultar informacion especifica.
-    if (expresionRegularDeLaUrlConId.test(req.url) && req.method === api.get) {
-      try {
-        const id = extraerIdDeLaUrl(req.url, 4);
-        const worker = await Worker.findById(id);
-        if (!worker) {
-          throw new Error("El empleado no esta registrado");
-        }
+    // URLs estaticas
+    if (expRegRutaEstatica.test(req.url)) {
+      // Metodo GET
+      if (req.method === api.get) {
+        const workers = await Worker.find();
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(worker));
-      } catch (error) {
-        res.writeHead(404, { "Content-Type": "application/json" });
-        if (error.name === "CastError")
-          error.message =
-            "El formato del ID es invalido. Por favor ingrese el ID correctamente";
-        res.end(JSON.stringify({ message: error.message }));
+        res.end(JSON.stringify(workers));
       }
-    }
 
-    // Metodo POST
-    if (expresionRegularDeLaUrlNormal.test(req.url) && req.method === "POST") {
-      try {
-        let body = "";
-        req.on("data", (chunk) => {
-          body += chunk.toString();
-        });
-        req.on("end", async () => {
-          let worker = new Worker(JSON.parse(body));
-          await worker.save();
+      // Metodo POST
+      if (req.method === api.post) {
+        try {
+          let body = "";
+          req.on("data", (chunk) => {
+            body += chunk.toString();
+          });
+          req.on("end", async () => {
+            let worker = new Worker(JSON.parse(body));
+            await worker.save();
+            res.writeHead(201, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(worker));
+          });
+        } catch (error) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ message: error }));
+        }
+      }
+    } else {
+      // URLs dinamicas
+      // Metodo GET con un ID para consultar informacion especifica.
+      if (req.method === api.get) {
+        try {
+          const id = extraerIdDeLaUrl(req.url, 4);
+          const worker = await Worker.findById(id);
+          if (!worker) {
+            throw new Error("El empleado no esta registrado");
+          }
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(worker));
-        });
-      } catch (error) {
-        res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ message: error }));
-      }
-    }
-    // Metodo PUT con un ID para actualizar informacion especifica.
-    if (expresionRegularDeLaUrlConId.test(req.url) && req.method === api.put) {
-      try {
-        const id = extraerIdDeLaUrl(req.url, 4);
-        let body = "";
-        req.on("data", (chunk) => {
-          body += chunk.toString();
-        });
-        req.on("end", async () => {
-          let updatedWorker = await Worker.findByIdAndUpdate(
-            id,
-            JSON.parse(body),
-            {
-              new: true,
-            }
-          );
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify(updatedWorker));
-        });
-      } catch (error) {
-        res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ message: error.message }));
-      }
-    }
-
-    // Metodo DELETE con un ID para eliminar informacion especifica.
-    if (
-      expresionRegularDeLaUrlConId.test(req.url) &&
-      req.method === api.delete
-    ) {
-      try {
-        const id = extraerIdDeLaUrl(req.url, 4);
-        const deletedWorker = await Worker.findByIdAndDelete(id);
-
-        if (!deletedWorker) {
-          throw new Error("El empleado no esta registrado");
+        } catch (error) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          if (error.name === "CastError")
+            error.message =
+              "El formato del ID es invalido. Por favor ingrese el ID correctamente";
+          res.end(JSON.stringify({ message: error.message }));
         }
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({ message: "El empleado fue eliminado correctamente" })
-        );
-      } catch (error) {
-        res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ message: error.message }));
+      }
+      // Metodo PUT con un ID para actualizar informacion especifica.
+      if (req.method === api.put) {
+        try {
+          const id = extraerIdDeLaUrl(req.url, 4);
+          let body = "";
+          req.on("data", (chunk) => {
+            body += chunk.toString();
+          });
+          req.on("end", async () => {
+            let updatedWorker = await Worker.findByIdAndUpdate(
+              id,
+              JSON.parse(body),
+              {
+                new: true,
+              }
+            );
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(updatedWorker));
+          });
+        } catch (error) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ message: error.message }));
+        }
+      }
+
+      // Metodo DELETE con un ID para eliminar informacion especifica.
+      if (req.method === api.delete) {
+        try {
+          const id = extraerIdDeLaUrl(req.url, 4);
+          const deletedWorker = await Worker.findByIdAndDelete(id);
+
+          if (!deletedWorker) {
+            throw new Error("El empleado no esta registrado");
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              message: "El empleado fue eliminado correctamente",
+            })
+          );
+        } catch (error) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ message: error.message }));
+        }
       }
     }
   }
