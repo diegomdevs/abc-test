@@ -41,12 +41,15 @@ function extraerIdDeLaUrl(url, idPosition) {
  * peticion segun sea el caso.
  */
 const router = async function (req, res) {
-  // Con esta condicion nos encargamos de verificar si la url a la que
-  // apuntan las peticiones cumplan las reglas para recibirlas correcta-
-  // mente. Si se cumple la condicion la peticion sera recibida y proce-
-  // sada correctamente, en el caso contrario la aplicacion se encarga.
-
+  // Con esta condicion nos encargamos de verificar que las URLs que
+  // apuntan las peticiones esten correctamente escritas. Si la condicion
+  // se cumple la aplicacion directamente rechaza la peticion y le indica
+  // que la URL esta mal escrita, en el caso contrario la peticion entra
+  // a ser revisa y generar una respuesta dependiendo de los datos traidos
+  // de la peticion.
   if (!expRegRutaEstatica.test(req.url) && !expRegRutaDinamica.test(req.url)) {
+    // Se rechaza la peticion y se indica que la URL que apunta la peticion
+    // no existe.
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ message: "Pagina no encontrada" }));
   } else {
@@ -54,21 +57,28 @@ const router = async function (req, res) {
     // de peticion estamos recibiendo.
 
     // URLs estaticas
+    // La condicion se encarga de verificar si la URL es estatica.
     if (expRegRutaEstatica.test(req.url)) {
       // Metodo GET
       if (req.method === api.get) {
+        // Con el metodo find del Modelo Worker de nuestra
+        // base de datos buscamos todos los documentos registrados de
+        // dicha entidad en la base de datos.
         const workers = await Worker.find();
+        // Metemos los datos en la respuesta y se envian al usuario.
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(workers));
       }
-
       // Metodo POST
       if (req.method === api.post) {
         try {
+          // Recibimos los datos que nos envia el usuario para regisrarlo,
+          // en la base de datos.
           let body = "";
           req.on("data", (chunk) => {
             body += chunk.toString();
           });
+          // Se guarda y se le envia los datos ya registrados en la base de datos.
           req.on("end", async () => {
             let worker = new Worker(JSON.parse(body));
             await worker.save();
@@ -85,14 +95,24 @@ const router = async function (req, res) {
       // Metodo GET con un ID para consultar informacion especifica.
       if (req.method === api.get) {
         try {
+          // Se obtiene el ID de la URL dinamica
           const id = extraerIdDeLaUrl(req.url, 4);
+
+          // Se busca un documento a base de una ID
           const worker = await Worker.findById(id);
+
+          // Si la busqueda del documento resulta null se indica al
+          // usuario que no existe la documento que busca.
           if (!worker) {
             throw new Error("El empleado no esta registrado");
           }
+          // Se retorna al usuario la informacion que resulta de la
+          // busqueda
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(worker));
         } catch (error) {
+          // En el caso que el usuario mande una ID invalida se le
+          // indica que dicho error.
           res.writeHead(404, { "Content-Type": "application/json" });
           if (error.name === "CastError")
             error.message =
@@ -100,14 +120,20 @@ const router = async function (req, res) {
           res.end(JSON.stringify({ message: error.message }));
         }
       }
+      //
       // Metodo PUT con un ID para actualizar informacion especifica.
       if (req.method === api.put) {
         try {
+          // Se obtiene el ID de la URL dinamica.
           const id = extraerIdDeLaUrl(req.url, 4);
+          // Se recibe los datos que nos envia el usuario para regisrarlo
+          // en la base de datos.
           let body = "";
           req.on("data", (chunk) => {
             body += chunk.toString();
           });
+          // Se manda el cuerpo de la informacion que nos envia el usuario
+          // para actualizar algun documento en la base de datos.
           req.on("end", async () => {
             let updatedWorker = await Worker.findByIdAndUpdate(
               id,
@@ -116,6 +142,7 @@ const router = async function (req, res) {
                 new: true,
               }
             );
+            // Se devuelve al usuario los datos ya actualizados en la base de datos.
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify(updatedWorker));
           });
@@ -128,12 +155,16 @@ const router = async function (req, res) {
       // Metodo DELETE con un ID para eliminar informacion especifica.
       if (req.method === api.delete) {
         try {
+          // Se obtiene el ID de la URL dinamica.
           const id = extraerIdDeLaUrl(req.url, 4);
+          // Se busca el documento en la base de datos y se elimina.
           const deletedWorker = await Worker.findByIdAndDelete(id);
-
+          // Si la busqueda no retorna nada se notifica que el documento
+          // no existe.
           if (!deletedWorker) {
             throw new Error("El empleado no esta registrado");
           }
+          // Se le notifica al usuario que el documento ha sido eliminado.
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(
             JSON.stringify({
